@@ -4,6 +4,8 @@ import * as React from "react"
 import { X, Send, MoreVertical, Pencil, Trash2, RefreshCcw } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useChat } from "@/hooks/use-chat"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -23,6 +25,25 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+const LoadingDots = () => (
+  <div className="flex space-x-1.5 px-2">
+    <motion.div
+      className="h-2 w-2 rounded-full bg-gray-400"
+      animate={{ scale: [1, 1.2, 1] }}
+      transition={{ duration: 1, repeat: Infinity, repeatDelay: 0.2 }}
+    />
+    <motion.div
+      className="h-2 w-2 rounded-full bg-gray-400"
+      animate={{ scale: [1, 1.2, 1] }}
+      transition={{ duration: 1, repeat: Infinity, repeatDelay: 0.2, delay: 0.2 }}
+    />
+    <motion.div
+      className="h-2 w-2 rounded-full bg-gray-400"
+      animate={{ scale: [1, 1.2, 1] }}
+      transition={{ duration: 1, repeat: Infinity, repeatDelay: 0.2, delay: 0.4 }}
+    />
+  </div>
+)
 
 export function ChatPopup() {
   const { isOpen, setIsOpen, currentBot } = useChatStore()
@@ -51,10 +72,10 @@ export function ChatPopup() {
   }
 
   React.useEffect(() => {
-    if (messages.length > 0) {
+    if (isStreaming && messages?.length > 0) {
       scrollToBottom()
     }
-  }, [messages])
+  }, [isStreaming, messages])
 
   if (!currentBot) return null
 
@@ -225,9 +246,42 @@ export function ChatPopup() {
                             </form>
                           ) : (
                             <>
-                              <p className="whitespace-pre-line">
-                                {message.deleted ? "This message was deleted" : message.content}
-                              </p>
+                              {message.sender === "bot" ? (
+                                <div className="prose prose-sm max-w-none prose-p:my-0 prose-p:leading-normal prose-pre:mt-2 prose-pre:mb-2 prose-headings:mb-2 prose-headings:mt-4 first:prose-headings:mt-0">
+                                  {message.deleted ? (
+                                    <p className="italic opacity-70">This message was deleted</p>
+                                  ) : (
+                                    <ReactMarkdown 
+                                      remarkPlugins={[remarkGfm]}
+                                      components={{
+                                        p: ({ children }) => (
+                                          <p className="m-0">{children}</p>
+                                        ),
+                                        pre: ({ ...props }) => (
+                                          <div className="relative">
+                                            <pre {...props} className="bg-black/5 rounded-md p-4 overflow-x-auto" />
+                                          </div>
+                                        ),
+                                        code: ({ ...props }) => (
+                                          <code {...props} className="bg-black/5 rounded-sm px-1 py-0.5" />
+                                        ),
+                                      }}
+                                    >
+                                      {message.content || ''}
+                                    </ReactMarkdown>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="whitespace-pre-line">
+                                  {message.deleted ? "This message was deleted" : message.content}
+                                </p>
+                              )}
+                              {message.sender === "bot" && 
+                               message.id === messages[messages.length - 1]?.id && 
+                               isStreaming && 
+                               !message.content && (
+                                <LoadingDots />
+                              )}
                               {message.edited && !message.deleted && (
                                 <span className="text-xs opacity-70 mt-1">edited</span>
                               )}
