@@ -19,16 +19,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Edit2, Play } from "lucide-react"
-import { useChatStore } from "@/lib/store"
-import Cookies from "js-cookie"
-import { toast } from "@/hooks/use-toast"
-
-interface Bot {
-  id: string
-  headline: string
-  logo: string | null
-  created_at: string
-}
+import { useBotManagement, DEFAULT_LOGO, DEFAULT_VALUES, Bot } from "@/hooks/use-bot-management"
+import { useBotDialogs } from "@/hooks/use-bot-dialogs"
 
 interface BotInfo {
   id: string
@@ -47,260 +39,66 @@ interface BotManagementProps {
 }
 
 export function BotManagement({ onBotLoad }: BotManagementProps) {
-  const [bots, setBots] = React.useState<Bot[]>([])
-  const [isCreateOpen, setIsCreateOpen] = React.useState(false)
-  const [isPasswordOpen, setIsPasswordOpen] = React.useState(false)
-  const [selectedBot, setSelectedBot] = React.useState<Bot | null>(null)
-  const [action, setAction] = React.useState<"edit" | "load" | null>(null)
-  const DEFAULT_LOGO = "https://upload.wikimedia.org/wikipedia/commons/0/0c/Chatbot_img.png"
-  const DEFAULT_VALUES = {
-    headline: "Hello, I'm your AI Assistant",
-    starter_message: {
-      message: "Welcome! I'm here to help answer your questions and provide assistance. How can I help you today?",
-      action_items: [
-        "Learn about our security measures",
-        "View our pricing plans and features",
-      ]
-    }
-  }
+  const {
+    bots,
+    selectedBot,
+    formData,
+    setFormData,
+    handleCreateBot,
+    handleUpdateBot,
+    handleAction,
+    handlePasswordSubmit,
+    resetForm,
+  } = useBotManagement(onBotLoad)
 
-  const [formData, setFormData] = React.useState({
-    headline: DEFAULT_VALUES.headline,
-    starter_message: {
-      message: DEFAULT_VALUES.starter_message.message,
-      action_items: DEFAULT_VALUES.starter_message.action_items
-    },
-    secondary_description: "",
-    logo: "",
-    admin_password: "",
-  })
-  const [password, setPassword] = React.useState("")
+  const {
+    isCreateOpen,
+    setIsCreateOpen,
+    isPasswordOpen,
+    password,
+    setPassword,
+    action,
+    setAction,
+    openCreateDialog,
+    closeCreateDialog,
+    openPasswordDialog,
+    closePasswordDialog,
+  } = useBotDialogs()
 
-  React.useEffect(() => {
-    fetchBots()
-  }, [])
-
-  const fetchBots = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bot`)
-      const data = await response.json()
-      setBots(data)
-    } catch (error) {
-      console.error("Failed to fetch bots:", error)
-    }
-  }
-
-  const fetchBotInfo = async (botId: string, password: string) => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bot/${botId}`, {
-        headers: {
-          'admin-password': password
-        }
-      })
-      if (response.status === 401) {
-        toast({
-          variant: "destructive",
-          title: "Authentication Error",
-          description: "Invalid admin password. Please try again.",
-        })
-        return null
-      }
-      if (!response.ok) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to fetch bot information. Please try again.",
-        })
-        return null
-      }
-      const data = await response.json()
-      return data as BotInfo
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-      })
-      return null
-    }
-  }
-
-  const handleCreateBot = async (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    try {
-      const submissionData = {
-        ...formData,
-        logo: formData.logo || DEFAULT_LOGO
-      }
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bot`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "admin-password": formData.admin_password
-        },
-        body: JSON.stringify(submissionData),
-      })
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Bot created successfully!",
-        })
-        setIsCreateOpen(false)
-        setFormData({
-          headline: DEFAULT_VALUES.headline,
-          starter_message: {
-            message: DEFAULT_VALUES.starter_message.message,
-            action_items: DEFAULT_VALUES.starter_message.action_items
-          },
-          secondary_description: "",
-          logo: "",
-          admin_password: "",
-        })
-        fetchBots()
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to create bot. Please try again.",
-        })
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-      })
+    const success = await handleCreateBot()
+    if (success) {
+      closeCreateDialog()
     }
   }
 
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedBot) return
-
-    const botInfo = await fetchBotInfo(selectedBot.id, password)
-    if (!botInfo) return
-      
-    // Save password in cookie for this bot
-    Cookies.set(`bot_${selectedBot.id}`, password, { path: "/" })
-    setIsPasswordOpen(false)
-    setPassword("")
-
-    if (action === "load") {
-      onBotLoad(botInfo)
-      toast({
-        title: "Success",
-        description: "Bot loaded successfully!",
-      })
-    } else if (action === "edit") {
-      setFormData({
-        headline: botInfo.headline,
-        starter_message: botInfo.starter_message,
-        secondary_description: botInfo.secondary_description || "",
-        logo: botInfo.logo || "",
-        admin_password: password,
-      })
-      setIsCreateOpen(true)
+    const success = await handleUpdateBot()
+    if (success) {
+      closeCreateDialog()
     }
   }
 
-  const handleAction = async (bot: Bot, actionType: "edit" | "load") => {
-    const savedPassword = Cookies.get(`bot_${bot.id}`)
-    if (savedPassword) {
-      const botInfo = await fetchBotInfo(bot.id, savedPassword)
-      if (!botInfo) {
-        // If saved password is invalid, prompt for password
-        setSelectedBot(bot)
-        setAction(actionType)
-        setIsPasswordOpen(true)
-        return
-      }
-
-      if (actionType === "load") {
-        onBotLoad(botInfo)
-        toast({
-          title: "Success",
-          description: "Bot loaded successfully!",
-        })
-      } else {
-        setSelectedBot(bot)
-        setFormData({
-          headline: botInfo.headline,
-          starter_message: botInfo.starter_message,
-          secondary_description: botInfo.secondary_description || "",
-          logo: botInfo.logo || "",
-          admin_password: savedPassword,
-        })
-        setIsCreateOpen(true)
-      }
-    } else {
-      setSelectedBot(bot)
-      setAction(actionType)
-      setIsPasswordOpen(true)
-    }
-  }
-
-  const handleUpdateBot = async (e: React.FormEvent) => {
+  const handlePasswordFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedBot) return
-
-    try {
-      const submissionData = {
-        headline: formData.headline,
-        starter_message: formData.starter_message,
-        secondary_description: formData.secondary_description || null,
-        logo: formData.logo || DEFAULT_LOGO
+    const success = await handlePasswordSubmit(password)
+    if (success) {
+      closePasswordDialog()
+      if (action === "edit") {
+        openCreateDialog()
       }
+    }
+  }
 
-      // Get the saved password from the cookie
-      const savedPassword = Cookies.get(`bot_${selectedBot.id}`)
-      if (!savedPassword) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Authentication required. Please try again.",
-        })
-        return
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/bot/${selectedBot.id}`, {
-        method: "PUT",
-        headers: { 
-          "Content-Type": "application/json",
-          "admin-password": savedPassword
-        },
-        body: JSON.stringify(submissionData),
-      })
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Bot updated successfully!",
-        })
-        setIsCreateOpen(false)
-        setSelectedBot(null)
-        setFormData({
-          headline: DEFAULT_VALUES.headline,
-          starter_message: {
-            message: DEFAULT_VALUES.starter_message.message,
-            action_items: DEFAULT_VALUES.starter_message.action_items
-          },
-          secondary_description: "",
-          logo: "",
-          admin_password: "",
-        })
-        fetchBots()
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to update bot. Please try again.",
-        })
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-      })
+  const handleBotAction = async (bot: Bot, actionType: "edit" | "load") => {
+    setAction(actionType)
+    const result = await handleAction(bot, actionType)
+    if (result.requiresPassword) {
+      openPasswordDialog()
+    } else if (actionType === "edit") {
+      openCreateDialog()
     }
   }
 
@@ -321,18 +119,8 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
             <h2 className="text-2xl font-semibold">Available Bots</h2>
             <Button 
               onClick={() => {
-                setSelectedBot(null)
-                setFormData({
-                  headline: DEFAULT_VALUES.headline,
-                  starter_message: {
-                    message: DEFAULT_VALUES.starter_message.message,
-                    action_items: DEFAULT_VALUES.starter_message.action_items
-                  },
-                  secondary_description: "",
-                  logo: "",
-                  admin_password: "",
-                })
-                setIsCreateOpen(true)
+                resetForm()
+                openCreateDialog()
               }}
               className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white"
             >
@@ -369,18 +157,8 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
               </p>
               <Button 
                 onClick={() => {
-                  setSelectedBot(null)
-                  setFormData({
-                    headline: DEFAULT_VALUES.headline,
-                    starter_message: {
-                      message: DEFAULT_VALUES.starter_message.message,
-                      action_items: DEFAULT_VALUES.starter_message.action_items
-                    },
-                    secondary_description: "",
-                    logo: "",
-                    admin_password: "",
-                  })
-                  setIsCreateOpen(true)
+                  resetForm()
+                  openCreateDialog()
                 }} 
                 size="lg"
                 className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white"
@@ -427,7 +205,9 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => handleAction(bot, "edit")}
+                            onClick={async () => {
+                              await handleBotAction(bot, "edit")
+                            }}
                             className="hover:bg-purple-50 hover:text-purple-500 transition-colors"
                           >
                             <Edit2 className="h-4 w-4" />
@@ -435,7 +215,9 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => handleAction(bot, "load")}
+                            onClick={async () => {
+                              await handleBotAction(bot, "load")
+                            }}
                             className="hover:bg-blue-50 hover:text-blue-500 transition-colors"
                           >
                             <Play className="h-4 w-4" />
@@ -453,17 +235,7 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
 
       <Dialog open={isCreateOpen} onOpenChange={(open) => {
         if (!open) {
-          setSelectedBot(null)
-          setFormData({
-            headline: DEFAULT_VALUES.headline,
-            starter_message: {
-              message: DEFAULT_VALUES.starter_message.message,
-              action_items: DEFAULT_VALUES.starter_message.action_items
-            },
-            secondary_description: "",
-            logo: "",
-            admin_password: "",
-          })
+          resetForm()
         }
         setIsCreateOpen(open)
       }}>
@@ -474,7 +246,7 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
               {selectedBot ? "Update the details of your chat bot." : "Fill in the details to create a new chat bot."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={selectedBot ? handleUpdateBot : handleCreateBot} className="flex-1 overflow-hidden flex flex-col">
+          <form onSubmit={selectedBot ? handleUpdateSubmit : handleCreateSubmit} className="flex-1 overflow-hidden flex flex-col">
             <div className="flex-1 overflow-y-auto">
               <div className="px-4 py-2 space-y-3">
                 <div className="grid gap-1">
@@ -669,7 +441,11 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isPasswordOpen} onOpenChange={setIsPasswordOpen}>
+      <Dialog open={isPasswordOpen} onOpenChange={(open) => {
+        if (!open) {
+          closePasswordDialog()
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Enter Bot Password</DialogTitle>
@@ -677,7 +453,7 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
               Please enter the admin password to {action === "load" ? "run" : "edit"} this bot.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handlePasswordSubmit}>
+          <form onSubmit={handlePasswordFormSubmit}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <label htmlFor="password" className="text-sm font-medium">
@@ -696,7 +472,7 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsPasswordOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => closePasswordDialog()}>
                 Cancel
               </Button>
               <Button type="submit">Continue</Button>

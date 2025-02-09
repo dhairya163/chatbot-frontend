@@ -3,9 +3,7 @@
 import * as React from "react"
 import { X, Send, MoreVertical, Pencil, Trash2, RefreshCcw } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { v4 as uuidv4 } from 'uuid'
-import Cookies from 'js-cookie'
-import { toast } from "@/hooks/use-toast"
+import { useChat } from "@/hooks/use-chat"
 
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -36,26 +34,28 @@ interface Bot {
   logo: string | null
 }
 
-interface Message {
-  id: string
-  content: string
-  sender: "bot" | "user"
-  actions?: string[]
-  deleted?: boolean
-  edited?: boolean
-  isEditing?: boolean
-}
 
 export function ChatPopup() {
   const { isOpen, setIsOpen, currentBot } = useChatStore()
-  const [messages, setMessages] = React.useState<Message[]>([])
-  const [inputValue, setInputValue] = React.useState("")
-  const [editValue, setEditValue] = React.useState("")
-  const [chatId, setChatId] = React.useState<string>("")
-  const [messageToDelete, setMessageToDelete] = React.useState<string | null>(null)
-  const [isStreaming, setIsStreaming] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const messagesEndRef = React.useRef<HTMLDivElement>(null)
+
+  const {
+    messages,
+    inputValue,
+    setInputValue,
+    editValue,
+    setEditValue,
+    messageToDelete,
+    setMessageToDelete,
+    isStreaming,
+    handleSendMessage,
+    handleDeleteMessage,
+    handleEditMessage,
+    handleSaveEdit,
+    handleCancelEdit,
+    handleResetChat
+  } = useChat(currentBot)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -66,279 +66,6 @@ export function ChatPopup() {
       scrollToBottom()
     }
   }, [messages])
-
-  React.useEffect(() => {
-    if (currentBot) {
-      const savedChatId = Cookies.get(`chat_${currentBot.id}`)
-      if (savedChatId) {
-        setChatId(savedChatId)
-        loadChatHistory(savedChatId)
-      } else {
-        const newChatId = uuidv4()
-        setChatId(newChatId)
-        Cookies.set(`chat_${currentBot.id}`, newChatId)
-        setMessages([
-          {
-            id: "1",
-            content: currentBot.starter_message.message,
-            sender: "bot",
-            actions: currentBot.starter_message.action_items,
-          },
-        ])
-      }
-    }
-  }, [currentBot])
-
-  const loadChatHistory = async (chatId: string) => {
-    if (!currentBot) return
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat/history?chat_id=${chatId}&bot_id=${currentBot.id}`
-      )
-      
-      if (!response.ok) {
-        throw new Error('Failed to load chat history')
-      }
-
-      const data = await response.json()
-      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
-        id: msg.message_id,
-        content: msg.message,
-        sender: msg.type === 'user' ? 'user' : 'bot',
-        deleted: msg.is_deleted,
-        edited: msg.versions.length > 1,
-      }))
-
-      setMessages(formattedMessages)
-    } catch (error) {
-      // If history load fails, show starter message
-      setMessages([
-        {
-          id: "1",
-          content: currentBot.starter_message.message,
-          sender: "bot",
-          actions: currentBot.starter_message.action_items,
-        },
-      ])
-    }
-  }
-
-  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement> | string) => {
-    // If already streaming, don't allow new messages
-    if (isStreaming) return
-    
-    // If e is a string, it's from an action button. Otherwise, prevent form submission
-    if (typeof e !== 'string') {
-      e.preventDefault()
-    }
-    
-    const messageText = typeof e === 'string' ? e : inputValue
-    if (!messageText.trim() || !currentBot) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: messageText,
-      sender: "user",
-    }
-
-    setMessages(prev => {
-      // Remove starter message if it exists
-      const filteredMessages = prev.filter(msg => msg.id !== "1")
-      return [...filteredMessages, userMessage]
-    })
-    setInputValue("")
-    setIsStreaming(true)
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat/sse`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: messageText,
-          chat_id: chatId,
-          bot_id: currentBot.id,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to send message')
-      }
-
-      const reader = response.body?.getReader()
-      let botResponse = ''
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          const chunk = new TextDecoder().decode(value)
-          let parsedChunk = ''
-          try {
-            const lines = chunk.split('\n')
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = JSON.parse(line.slice(5))
-                if (data.delta) {
-                  parsedChunk += data.delta
-                }
-              }
-            }
-          } catch (e) {
-            console.log(chunk)
-          }
-          botResponse += parsedChunk
-
-          // Update the UI with the partial response
-          setMessages(prev => {
-            const lastMessage = prev[prev.length - 1]
-            if (lastMessage.sender === 'bot') {
-              return prev.map((msg, i) => 
-                i === prev.length - 1 ? { ...msg, content: botResponse } : msg
-              )
-            } else {
-              return [...prev, { id: Date.now().toString(), content: botResponse, sender: 'bot' }]
-            }
-          })
-        }
-
-        // After SSE stream ends, reload chat history to sync with backend
-        await loadChatHistory(chatId)
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to send message",
-      })
-    } finally {
-      setIsStreaming(false)
-    }
-  }
-
-  const handleDeleteMessage = async (id: string) => {
-    if (!currentBot) return
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat/message`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          bot_id: currentBot.id,
-          message_id: id,
-          is_delete: true
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete message')
-      }
-
-      const data = await response.json()
-      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
-        id: msg.message_id,
-        content: msg.message,
-        sender: msg.type === 'user' ? 'user' : 'bot',
-        deleted: msg.is_deleted,
-        edited: msg.versions.length > 1,
-      }))
-
-      setMessages(formattedMessages)
-      setMessageToDelete(null)
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete message",
-      })
-    }
-  }
-
-  const handleEditMessage = (id: string) => {
-    const message = messages.find((msg) => msg.id === id)
-    if (message) {
-      setEditValue(message.content)
-      setMessages(messages.map((msg) => ({
-        ...msg,
-        isEditing: msg.id === id
-      })))
-      inputRef.current?.focus()
-    }
-  }
-
-  const handleSaveEdit = async (id: string) => {
-    if (!currentBot) return
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/chat/message`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: chatId,
-          bot_id: currentBot.id,
-          message_id: id,
-          updated_value: editValue
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to edit message')
-      }
-
-      const data = await response.json()
-      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
-        id: msg.message_id,
-        content: msg.message,
-        sender: msg.type === 'user' ? 'user' : 'bot',
-        deleted: msg.is_deleted,
-        edited: msg.versions.length > 1,
-      }))
-
-      setMessages(formattedMessages)
-      setEditValue("")
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to edit message",
-      })
-    }
-  }
-
-  const handleCancelEdit = () => {
-    setMessages(messages.map((msg) => ({
-      ...msg,
-      isEditing: false
-    })))
-    setEditValue("")
-  }
-
-  const handleResetChat = () => {
-    if (!currentBot) return
-    
-    const newChatId = uuidv4()
-    setChatId(newChatId)
-    Cookies.set(`chat_${currentBot.id}`, newChatId)
-    
-    setMessages([
-      {
-        id: "1",
-        content: currentBot.starter_message.message,
-        sender: "bot",
-        actions: currentBot.starter_message.action_items,
-      },
-    ])
-    setInputValue("")
-    setEditValue("")
-  }
 
   if (!currentBot) return null
 
@@ -387,28 +114,43 @@ export function ChatPopup() {
             className="fixed right-4 bottom-20 z-50 w-[380px]"
           >
             <Card className="h-[600px] flex flex-col">
-              <CardHeader className="flex flex-row items-center gap-4 p-4">
-                <Button size="icon" variant="ghost" className="absolute left-2" onClick={() => setIsOpen(false)}>
+              <CardHeader className="flex flex-col items-center gap-0 pt-4 pb-0 px-4 relative">
+                <Button size="icon" variant="ghost" className="absolute left-2 top-2" onClick={() => setIsOpen(false)}>
                   <X className="h-4 w-4" />
                 </Button>
-                <div className="flex items-center gap-3 mx-auto">
-                  <Avatar>
+                <motion.div
+                  transition={{ 
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <Avatar className="h-16 w-16 ring-2 ring-purple-500/20 ring-offset-2">
                     {currentBot.logo ? (
                       <AvatarImage src={currentBot.logo} />
                     ) : (
-                      <AvatarFallback>
+                      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
                         {currentBot.headline.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     )}
                   </Avatar>
-                  <div className="text-lg">{currentBot.headline}</div>
-                </div>
-                <Button size="icon" variant="ghost" className="absolute right-2" onClick={handleResetChat}>
+                </motion.div>
+                <motion.div 
+                  className="text-base font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
+                  transition={{ 
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  {currentBot.headline}
+                </motion.div>
+                <Button size="icon" variant="ghost" className="absolute right-2 top-0" onClick={handleResetChat} disabled={isStreaming}>
                   <RefreshCcw className="h-4 w-4" />
                 </Button>
               </CardHeader>
 
-              <div className="text-center text-muted-foreground px-4 pb-4">
+              <div className="text-center text-sm text-muted-foreground px-4 pb-4">
                 Ask me anything or pick a place to start
               </div>
 
@@ -419,9 +161,20 @@ export function ChatPopup() {
                       key={message.id}
                       className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
                     >
+                      {message.sender === "bot" && (
+                        <Avatar className="h-8 w-8 mr-2 flex-shrink-0">
+                          {currentBot.logo ? (
+                            <AvatarImage src={currentBot.logo} />
+                          ) : (
+                            <AvatarFallback>
+                              {currentBot.headline.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                      )}
                       <div className="group relative">
                         <div
-                          className={`rounded-lg px-4 py-2 max-w-[280px] space-y-2 ${
+                          className={`rounded-lg px-4 py-2 max-w-[280px] ${
                             message.sender === "user" ? "bg-[#7C3AED] text-white" : "bg-[#F3F4F6]"
                           } ${message.deleted ? "italic opacity-70" : ""}`}
                         >
@@ -469,26 +222,27 @@ export function ChatPopup() {
                               <p className="whitespace-pre-line">
                                 {message.deleted ? "This message was deleted" : message.content}
                               </p>
-                              {message.actions && !message.deleted && (
-                                <div className="flex flex-col gap-2">
-                                  {message.actions.map((action) => (
-                                    <Button 
-                                      key={action} 
-                                      variant="outline" 
-                                      className="justify-start border-[#7C3AED] text-[#7C3AED] hover:bg-[#7C3AED] hover:text-white transition-colors"
-                                      onClick={() => handleSendMessage(action)}
-                                    >
-                                      {action}
-                                    </Button>
-                                  ))}
-                                </div>
-                              )}
                               {message.edited && !message.deleted && (
                                 <span className="text-xs opacity-70 mt-1">edited</span>
                               )}
                             </>
                           )}
                         </div>
+                        {message.actions && !message.deleted && (
+                          <div className="flex flex-col gap-1.5 mt-2 pl-2">
+                            {message.actions.map((action) => (
+                              <Button 
+                                key={action} 
+                                variant="outline" 
+                                size="sm"
+                                className="justify-start rounded-full bg-white border border-purple-400 text-purple-500 hover:bg-purple-100/50 hover:border-purple-500 hover:text-purple-600 transition-all duration-200 px-3 py-1 text-xs font-medium w-fit"
+                                onClick={() => handleSendMessage(action)}
+                              >
+                                {action}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
                         {message.sender === "user" && !message.deleted && !message.isEditing && !isStreaming && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -525,18 +279,23 @@ export function ChatPopup() {
                 </div>
               </CardContent>
 
-              <CardFooter className="border-t p-4">
-                <form onSubmit={handleSendMessage} className="flex w-full items-center gap-2">
+              <CardFooter className="p-4 border-t bg-gradient-to-r from-purple-50 to-white">
+                <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
                   <Input
                     ref={inputRef}
-                    placeholder={isStreaming ? "Please wait..." : "Type a message..."}
+                    placeholder={isStreaming ? "AI is thinking..." : "Ask me anything..."}
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 rounded-full border-purple-200 focus:border-purple-400 focus:outline-none focus:ring-0 focus-visible:ring-0 transition-colors duration-200"
                     disabled={isStreaming}
                   />
-                  <Button type="submit" size="icon" disabled={isStreaming}>
-                    <Send className="h-4 w-4" />
+                  <Button 
+                    type="submit" 
+                    size="icon" 
+                    disabled={isStreaming}
+                    className="rounded-full bg-purple-500 hover:bg-purple-600 transition-colors duration-200"
+                  >
+                    <Send className="h-4 w-4 text-white" />
                   </Button>
                 </form>
               </CardFooter>
