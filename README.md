@@ -1,24 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js Chatbot with ShadcN, Tailwind, and Zustand
+
+A modern, customizable chatbot built with Next.js, featuring a beautiful UI powered by ShadcN components and Tailwind CSS, with state management handled by Zustand.
+
+## Features
+
+- 💬 Interactive chat interface
+- 🎨 Beautiful UI components from ShadcN
+- 🎯 Responsive design with Tailwind CSS
+- 📦 Efficient state management using Zustand
+- ✏️ Message editing and deletion capabilities
+- 🔧 Admin panel for bot customization at `/admin`
+- 🚀 Quick action suggestions
 
 ## Getting Started
 
-First, run the development server:
+### Using npm
 
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Run the development server:
+```bash
+npm run dev
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Using Yarn
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Install dependencies:
+```bash
+yarn
+```
+
+2. Run the development server:
+```bash
+yarn dev
+```
+
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the chatbot in action.
+
+4. To customize the chatbot, visit [http://localhost:3000/admin](http://localhost:3000/admin)
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org) - React framework
+- [ShadcN](https://ui.shadcn.com/) - UI Components
+- [Tailwind CSS](https://tailwindcss.com) - Styling
+- [Zustand](https://zustand-demo.pmnd.rs/) - State Management
 
 ## Learn More
 
