@@ -651,9 +651,12 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
                           setFormData({ ...formData, admin_password: e.target.value })
                         }
                         required
-                        placeholder="Enter a secure password"
+                        minLength={8}
+                        placeholder="Enter a secure password (minimum 8 characters)"
                       />
-                      <p className="text-xs text-muted-foreground">Remember this for future access to manage your bot</p>
+                      <p className="text-xs text-muted-foreground">
+                        Password must be at least 8 characters long. Remember this for future access to manage your bot.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -686,6 +689,8 @@ export function BotManagement({ onBotLoad }: BotManagementProps) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  minLength={8}
+                  placeholder="Enter password (minimum 8 characters)"
                   autoFocus
                 />
               </div>
