@@ -100,6 +100,9 @@ export function useChat(currentBot: Bot | null) {
   }, [currentBot])
 
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement> | string) => {
+    if (typeof e !== 'string') {
+      e.preventDefault()
+    }
     if (isStreaming || !currentBot) return
     
     const messageText = typeof e === 'string' ? e : inputValue
