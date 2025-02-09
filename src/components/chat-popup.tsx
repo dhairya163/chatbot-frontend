@@ -114,40 +114,57 @@ export function ChatPopup() {
             className="fixed right-4 bottom-20 z-50 w-[380px]"
           >
             <Card className="h-[600px] flex flex-col">
-              <CardHeader className="flex flex-col items-center gap-0 pt-4 pb-0 px-4 relative">
-                <Button size="icon" variant="ghost" className="absolute left-2 top-2" onClick={() => setIsOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-                <motion.div
-                  transition={{ 
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  <Avatar className="h-16 w-16 ring-2 ring-purple-500/20 ring-offset-2">
-                    {currentBot.logo ? (
-                      <AvatarImage src={currentBot.logo} />
-                    ) : (
-                      <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
-                        {currentBot.headline.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                </motion.div>
-                <motion.div 
-                  className="text-base font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent"
-                  transition={{ 
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  {currentBot.headline}
-                </motion.div>
-                <Button size="icon" variant="ghost" className="absolute right-2 top-0" onClick={handleResetChat} disabled={isStreaming}>
-                  <RefreshCcw className="h-4 w-4" />
-                </Button>
+              <CardHeader className="pt-4 pb-0 px-4">
+                <div className="relative flex items-start justify-center w-full">
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="absolute left-0 top-0 h-8 w-8 [&_svg]:size-5" 
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+
+                  <div className="flex flex-col items-center pt-2">
+                    <motion.div
+                      transition={{ 
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    >
+                      <Avatar className="h-16 w-16 ring-2 ring-purple-500/20 ring-offset-2">
+                        {currentBot.logo ? (
+                          <AvatarImage src={currentBot.logo} />
+                        ) : (
+                          <AvatarFallback className="bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                            {currentBot.headline.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                    </motion.div>
+                    <motion.div 
+                      className="text-base font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mt-2"
+                      transition={{ 
+                        duration: 3,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    >
+                      {currentBot.headline}
+                    </motion.div>
+                  </div>
+
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="absolute right-0 top-0 h-8 w-8" 
+                    onClick={handleResetChat} 
+                    disabled={isStreaming}
+                  >
+                    <RefreshCcw className="h-5 w-5" />
+                  </Button>
+                </div>
               </CardHeader>
 
               <div className="text-center text-sm text-muted-foreground px-4 pb-4">
