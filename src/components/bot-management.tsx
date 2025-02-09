@@ -19,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Edit2, Play } from "lucide-react"
-import { useBotManagement, DEFAULT_LOGO, DEFAULT_VALUES, Bot } from "@/hooks/use-bot-management"
+import { useBotManagement, DEFAULT_LOGO, Bot } from "@/hooks/use-bot-management"
 import { useBotDialogs } from "@/hooks/use-bot-dialogs"
 
 interface BotInfo {

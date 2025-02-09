@@ -104,6 +104,7 @@ export function useBotManagement(onBotLoad: (bot: BotInfo) => void) {
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
       })
+      console.error("Failed to fetch bot information:", error)
       return null
     }
   }
@@ -144,6 +145,7 @@ export function useBotManagement(onBotLoad: (bot: BotInfo) => void) {
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
       })
+      console.error("Failed to create bot:", error)
       return false
     }
   }
@@ -199,6 +201,7 @@ export function useBotManagement(onBotLoad: (bot: BotInfo) => void) {
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
       })
+      console.error("Failed to update bot:", error)
       return false
     }
   }

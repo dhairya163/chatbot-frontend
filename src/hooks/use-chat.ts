@@ -24,6 +24,14 @@ interface Bot {
   logo: string | null
 }
 
+interface ChatMessage {
+  message_id: string
+  message: string
+  type: 'user' | 'bot'
+  is_deleted: boolean
+  versions: string[]
+}
+
 export function useChat(currentBot: Bot | null) {
   const [messages, setMessages] = React.useState<Message[]>([])
   const [inputValue, setInputValue] = React.useState("")
@@ -45,7 +53,7 @@ export function useChat(currentBot: Bot | null) {
       }
 
       const data = await response.json()
-      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
+      const formattedMessages: Message[] = data.messages.map((msg: ChatMessage) => ({
         id: msg.message_id,
         content: msg.message,
         sender: msg.type === 'user' ? 'user' : 'bot',
@@ -55,6 +63,7 @@ export function useChat(currentBot: Bot | null) {
 
       setMessages(formattedMessages)
     } catch (error) {
+      console.error('Failed to load chat history:', error)
       // If history load fails, show starter message
       setMessages([
         {
@@ -87,6 +96,7 @@ export function useChat(currentBot: Bot | null) {
         ])
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentBot])
 
   const handleSendMessage = async (e: React.FormEvent<HTMLFormElement> | string) => {
@@ -145,7 +155,8 @@ export function useChat(currentBot: Bot | null) {
                 }
               }
             }
-          } catch (e) {
+          } catch (error) {
+            console.error('Error parsing chunk:', error)
             console.log(chunk)
           }
           botResponse += parsedChunk
@@ -170,6 +181,7 @@ export function useChat(currentBot: Bot | null) {
         title: "Error",
         description: "Failed to send message",
       })
+      console.error('Failed to send message:', error)
     } finally {
       setIsStreaming(false)
     }
@@ -197,7 +209,7 @@ export function useChat(currentBot: Bot | null) {
       }
 
       const data = await response.json()
-      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
+      const formattedMessages: Message[] = data.messages.map((msg: ChatMessage) => ({
         id: msg.message_id,
         content: msg.message,
         sender: msg.type === 'user' ? 'user' : 'bot',
@@ -208,6 +220,7 @@ export function useChat(currentBot: Bot | null) {
       setMessages(formattedMessages)
       setMessageToDelete(null)
     } catch (error) {
+      console.error('Failed to delete message:', error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -249,7 +262,7 @@ export function useChat(currentBot: Bot | null) {
       }
 
       const data = await response.json()
-      const formattedMessages: Message[] = data.messages.map((msg: any) => ({
+      const formattedMessages: Message[] = data.messages.map((msg: ChatMessage) => ({
         id: msg.message_id,
         content: msg.message,
         sender: msg.type === 'user' ? 'user' : 'bot',
@@ -260,6 +273,7 @@ export function useChat(currentBot: Bot | null) {
       setMessages(formattedMessages)
       setEditValue("")
     } catch (error) {
+      console.error('Failed to edit message:', error)
       toast({
         variant: "destructive",
         title: "Error",

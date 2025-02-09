@@ -23,17 +23,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-interface Bot {
-  id: string
-  headline: string
-  starter_message: {
-    message: string
-    action_items: string[]
-  }
-  secondary_description: string | null
-  logo: string | null
-}
-
 
 export function ChatPopup() {
   const { isOpen, setIsOpen, currentBot } = useChatStore()
