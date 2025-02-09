@@ -12,6 +12,17 @@ import { Input } from "@/components/ui/input"
 import { useChatStore } from "@/lib/store"
 import Image from "next/image"
 
+interface Bot {
+  id: string
+  headline: string
+  starter_message: {
+    message: string
+    action_items: string[]
+  }
+  secondary_description: string | null
+  logo: string | null
+}
+
 interface Message {
   id: string
   content: string
@@ -22,23 +33,25 @@ interface Message {
   isEditing?: boolean
 }
 
-const initialMessage = {
-  id: "1", 
-  content: "Hi! How can I help you today?",
-  sender: "bot" as const,
-  actions: [
-    "Tell me about pricing",
-    "Learn about data security & privacy",
-    "Schedule a demo"
-  ],
-}
-
 export function ChatPopup() {
-  const { isOpen, setIsOpen } = useChatStore()
-  const [messages, setMessages] = React.useState<Message[]>([initialMessage])
+  const { isOpen, setIsOpen, currentBot } = useChatStore()
+  const [messages, setMessages] = React.useState<Message[]>([])
   const [inputValue, setInputValue] = React.useState("")
   const [editValue, setEditValue] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (currentBot) {
+      setMessages([
+        {
+          id: "1",
+          content: currentBot.starter_message.message,
+          sender: "bot",
+          actions: currentBot.starter_message.action_items,
+        },
+      ])
+    }
+  }, [currentBot])
 
   const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -91,10 +104,21 @@ export function ChatPopup() {
   }
 
   const handleResetChat = () => {
-    setMessages([initialMessage])
+    if (currentBot) {
+      setMessages([
+        {
+          id: "1",
+          content: currentBot.starter_message.message,
+          sender: "bot",
+          actions: currentBot.starter_message.action_items,
+        },
+      ])
+    }
     setInputValue("")
     setEditValue("")
   }
+
+  if (!currentBot) return null
 
   return (
     <>
@@ -127,10 +151,15 @@ export function ChatPopup() {
                 </Button>
                 <div className="flex items-center gap-3 mx-auto">
                   <Avatar>
-                    <AvatarImage src="/avatar.jpeg" />
-                    <AvatarFallback>VA</AvatarFallback>
+                    {currentBot.logo ? (
+                      <AvatarImage src={currentBot.logo} />
+                    ) : (
+                      <AvatarFallback>
+                        {currentBot.headline.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    )}
                   </Avatar>
-                  <div className="text-lg">Hey👋, I&apos;m Dhairya</div>
+                  <div className="text-lg">{currentBot.headline}</div>
                 </div>
                 <Button size="icon" variant="ghost" className="absolute right-2" onClick={handleResetChat}>
                   <RefreshCcw className="h-4 w-4" />
